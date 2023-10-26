@@ -3,9 +3,6 @@ from pytube import YouTube
 from tkinter import ttk
 from tkinter import messagebox
 import datetime
-import requests
-from PIL import Image, ImageTk
-from io import BytesIO
 
 def update_quality_combobox():
     url = url_entry.get()
@@ -18,50 +15,37 @@ def update_quality_combobox():
     yt = YouTube(url)
 
     if format_choice == "MP3":
-        streams = yt.streams.filter(only_audio=True, file_extension='mp4')
+        streams = yt.streams.filter(only_audio=True)
         format_label = "abr"
         options = [f"{stream.abr} kbps (mp3)" for stream in streams if stream.abr]
     else:
-        streams = yt.streams.filter(file_extension='mp4', progressive=True)
+        streams = yt.streams.filter(file_extension='mp4')
         format_label = "resolution"
         options = [f"{stream.resolution} ({stream.mime_type.split('/')[1]})" for stream in streams if stream.resolution]
 
     quality_combobox['values'] = options
     quality_combobox.set(options[0])
+    stream_dict = {option: stream for option, stream in zip(options, streams)}
+    quality_combobox.stream_dict = stream_dict
 
 def download_video():
-    url = url_entry.get()
-    format_choice = format_var.get()
     selected_option = quality_combobox.get()
 
-    if not url:
-        messagebox.showerror("Error", "enter a Youtube URL.")
+    if not hasattr(quality_combobox, 'stream_dict'):
+        messagebox.showerror("Error", "No quality options available. Fetch options first.")
         return
 
-    yt = YouTube(url)
-
-    if format_choice == "MP3":
-        streams = yt.streams.filter(only_audio=True, file_extension='mp4')
-        format_label = "abr"
-        options = [f"{stream.abr} kbps (mp3)" for stream in streams if stream.abr]
-    else:
-        streams = yt.streams.filter(file_extension='mp4', progressive=True)
-        format_label = "resolution"
-        options = [f"{stream.resolution} ({stream.mime_type.split('/')[1]})" for stream in streams if stream.resolution]
-
-    try:
-        index = [i for i, option in enumerate(options) if selected_option in option][0]
-        stream = streams[index]
-    except IndexError:
-        messagebox.showerror("Error", "quality not found update options.")
+    if selected_option not in quality_combobox.stream_dict:
+        messagebox.showerror("Error", "Quality not found. Update options.")
         return
 
+    stream = quality_combobox.stream_dict[selected_option]
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    filename = f"{yt.title}_{timestamp}.{format_choice.lower()}"
+    filename = f"{stream.title}_{timestamp}.{stream.subtype}"
 
     try:
         stream.download(output_path='Downloads', filename=filename)
-        messagebox.showinfo("Success", "Download success")
+        messagebox.showinfo("Success", "Download successful")
     except Exception as e:
         messagebox.showerror("Error", f"Download failed: {str(e)}")
 
@@ -69,12 +53,6 @@ root = tk.Tk()
 root.title("YouTube downloader by sloth")
 root.geometry("360x200") 
 root.resizable(False, False)
-
-icon_url = "https://raw.githubusercontent.com/Pstrw/icon/main/Icon.png"
-response = requests.get(icon_url)
-icon_data = response.content
-icon_image = Image.open(BytesIO(icon_data))
-root.iconphoto(True, ImageTk.PhotoImage(icon_image))
 
 format_label = ttk.Label(root, text="Choose a format:")
 format_label.pack()
